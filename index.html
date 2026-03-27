@@ -13,15 +13,17 @@
 <input type="text" id="fileName" placeholder="Enter file name">
 <button onclick="downloadFile()">Download</button>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+<!-- Supabase CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
+// 👇 YAHAN APNI DETAILS DAAL
 const supabaseClient = supabase.createClient(
-  "https://rxwonimvgjvecwrwehmb.supabase.co",  // 👈 yaha tera project URL
-  "sb_publishable_j0ck75fd0t8uIA40AhhFJw_YqfDCPHs"                  // 👈 yaha apni key daal
+  "https://rxwonimvgjvecwrwehmb.supabase.co",
+  "sb_publishable_j0ck75fd0t8uIA40AhhFJw_YqfDCPHs"
 );
 
-// Upload function
+// ✅ Upload
 async function uploadFile() {
   const file = document.getElementById('fileInput').files[0];
 
@@ -32,16 +34,18 @@ async function uploadFile() {
 
   const { error } = await supabaseClient.storage
     .from('files')
-    .upload(file.name, file);
+    .upload(file.name, file, {
+      upsert: true   // same file ko overwrite karega
+    });
 
   if (error) {
     alert("Upload error: " + error.message);
   } else {
-    alert("File upload ho gayi!");
+    alert("Upload ho gaya!");
   }
 }
 
-// Download function
+// ✅ Download
 async function downloadFile() {
   const name = document.getElementById('fileName').value;
 
@@ -54,7 +58,7 @@ async function downloadFile() {
     .from('files')
     .getPublicUrl(name);
 
-  if (data.publicUrl) {
+  if (data && data.publicUrl) {
     window.open(data.publicUrl);
   } else {
     alert("File nahi mili");
