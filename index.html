@@ -6,57 +6,15 @@
   <title>Mera Mood Detector</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/face-api.js/0.22.2/face-api.min.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      background: #0f0f0f;
-      color: white;
-      margin: 0;
-      padding: 20px;
-    }
-    h1 {
-      margin: 20px 0;
-      font-size: 2.5em;
-    }
-    .container {
-      position: relative;
-      display: inline-block;
-      margin: 20px auto;
-      border: 4px solid #00ff88;
-      border-radius: 15px;
-      overflow: hidden;
-      box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
-    }
-    #video, #canvas {
-      width: 640px;
-      height: 480px;
-    }
-    #result {
-      margin: 25px auto;
-      padding: 15px;
-      background: #1e1e1e;
-      border-radius: 12px;
-      max-width: 600px;
-      font-size: 1.8em;
-    }
-    button {
-      padding: 15px 30px;
-      font-size: 1.3em;
-      background: #00ff88;
-      color: black;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-      margin: 10px;
-    }
-    button:hover {
-      background: #00cc66;
-    }
-    #status {
-      margin-top: 15px;
-      font-size: 1.1em;
-      color: #aaa;
-    }
+    body { font-family: Arial, sans-serif; text-align: center; background: #0f0f0f; color: white; margin: 0; padding: 20px; }
+    h1 { margin: 20px 0; font-size: 2.5em; }
+    .container { position: relative; display: inline-block; margin: 20px auto; border: 5px solid #00ff88; border-radius: 15px; overflow: hidden; box-shadow: 0 0 25px rgba(0,255,136,0.6); }
+    #video, #canvas { width: 640px; height: 480px; }
+    #result { margin: 25px auto; padding: 20px; background: #1e1e1e; border-radius: 12px; max-width: 650px; font-size: 1.6em; }
+    button { padding: 15px 30px; font-size: 1.3em; background: #00ff88; color: black; border: none; border-radius: 10px; cursor: pointer; margin: 10px; }
+    button:hover { background: #00cc66; }
+    #status { margin-top: 15px; font-size: 1.2em; color: #aaa; }
+    .probs { font-size: 1em; color: #00ffcc; margin-top: 10px; text-align: left; display: inline-block; }
   </style>
 </head>
 <body>
@@ -68,34 +26,46 @@
   </div>
 
   <div id="result">
-    <h2>Current Mood: <span id="mood">Button dabao shuru karne ke liye</span></h2>
+    <h2>Current Mood: <span id="mood">Camera start karo...</span></h2>
     <p id="confidence"></p>
+    <div id="probs" class="probs"></div>
   </div>
 
   <button onclick="startCamera()">📸 Camera Start Karo</button>
   <button onclick="stopCamera()">⛔ Camera Band Karo</button>
 
-  <div id="status">Status: Ready</div>
+  <div id="status">Status: Ready - Button dabao</div>
 
   <script>
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
     const moodText = document.getElementById('mood');
     const confidenceText = document.getElementById('confidence');
+    const probsText = document.getElementById('probs');
     const statusText = document.getElementById('status');
 
     let currentStream = null;
     let detectionInterval = null;
     let modelsLoaded = false;
 
-    // Models load karne ka function
+    const emotionMap = {
+      happy: "😊 Khush",
+      sad: "😢 Udaas",
+      angry: "😠 Gussa",
+      surprised: "😲 Hairaan",
+      neutral: "😐 Normal",
+      fearful: "😨 Dar",
+      disgusted: "🤢 Ghrena"
+    };
+
     async function loadModels() {
       if (modelsLoaded) return;
       
-      statusText.textContent = "Status: Models download ho rahe hain... (pehle baar thoda time lagega)";
+      statusText.textContent = "Status: Models download ho rahe hain... (10-20 seconds lag sakte hain pehli baar)";
       
-      const MODEL_URL = "https://justadudewhohacks.github.io/face-api.js/models";
-      
+      // Updated reliable URLs
+      const MODEL_URL = "https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights";
+
       try {
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
@@ -104,52 +74,39 @@
         ]);
         
         modelsLoaded = true;
-        statusText.textContent = "Status: Models loaded successfully ✅";
-        console.log("✅ All models loaded");
+        statusText.textContent = "✅ Models loaded! Ab apna face camera mein dikhao";
+        console.log("Models successfully loaded");
       } catch (err) {
-        statusText.textContent = "Status: Models load karne mein error!";
         console.error(err);
-        alert("Models load nahi ho paye. Internet check karo aur page refresh karo.");
+        statusText.textContent = "❌ Models load nahi hue. Internet check karo aur page refresh karo.";
+        alert("Models download mein problem aa rahi hai. Internet fast ho aur page refresh kar ke try karo.");
       }
     }
 
-    // Camera start
     async function startCamera() {
-      if (currentStream) {
-        stopCamera();
-      }
+      stopCamera(); // pehle clean karo
 
       try {
-        statusText.textContent = "Status: Camera access maang raha hoon...";
+        statusText.textContent = "Status: Camera khol raha hoon...";
         
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { 
-            facingMode: "user",
-            width: 640,
-            height: 480
-          }
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: "user", width: 640, height: 480 } 
         });
         
         currentStream = stream;
         video.srcObject = stream;
-        
         await video.play();
-        
-        // Models load karo (agar nahi load hue)
+
         await loadModels();
-        
-        // Detection shuru karo
         startDetection();
-        
-        statusText.textContent = "Status: Camera chal raha hai | Face detect ho raha hai...";
+
       } catch (err) {
-        statusText.textContent = "Status: Camera access denied!";
-        alert("Camera permission nahi mila. Browser settings mein allow karo.");
         console.error(err);
+        statusText.textContent = "❌ Camera permission nahi mila ya error hai";
+        alert("Camera allow nahi kiya ya koi technical issue hai. Browser settings check karo.");
       }
     }
 
-    // Detection loop
     function startDetection() {
       if (detectionInterval) clearInterval(detectionInterval);
 
@@ -157,72 +114,62 @@
       faceapi.matchDimensions(canvas, displaySize);
 
       detectionInterval = setInterval(async () => {
-        if (!modelsLoaded) return;
+        if (!modelsLoaded || !video.videoWidth) return;
 
         const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
           .withFaceLandmarks()
           .withFaceExpressions();
 
-        const resizedDetections = faceapi.resizeResults(detections, displaySize);
+        const resized = faceapi.resizeResults(detections, displaySize);
 
-        // Canvas pe draw karo
+        // Draw on canvas
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        faceapi.draw.drawDetections(canvas, resizedDetections);
-        faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
+        faceapi.draw.drawDetections(canvas, resized);
+        faceapi.draw.drawFaceLandmarks(canvas, resized);
 
         if (detections.length > 0) {
-          const expressions = detections[0].expressions;
+          const expr = detections[0].expressions;
           
           // Sabse strong emotion
-          let maxEmotion = Object.keys(expressions).reduce((a, b) => 
-            expressions[a] > expressions[b] ? a : b
-          );
+          let maxEmo = Object.keys(expr).reduce((a, b) => expr[a] > expr[b] ? a : b);
+          let conf = (expr[maxEmo] * 100).toFixed(1);
 
-          let confidence = (expressions[maxEmotion] * 100).toFixed(1);
+          moodText.textContent = emotionMap[maxEmo] || maxEmo.toUpperCase();
+          confidenceText.innerHTML = `Confidence: <strong>${conf}%</strong>`;
 
-          const emotionMap = {
-            happy: "😊 Khush",
-            sad: "😢 Udaas",
-            angry: "😠 Gussa",
-            surprised: "😲 Hairaan",
-            neutral: "😐 Normal",
-            fearful: "😨 Dar",
-            disgusted: "🤢 Ghrena"
-          };
+          // Top 3 emotions dikhane ke liye
+          let top3 = Object.entries(expr)
+            .sort((a,b) => b[1] - a[1])
+            .slice(0,3)
+            .map(([emo, val]) => `${emotionMap[emo] || emo}: ${(val*100).toFixed(0)}%`)
+            .join(" | ");
 
-          moodText.textContent = emotionMap[maxEmotion] || maxEmotion.toUpperCase();
-          confidenceText.innerHTML = `Confidence: <strong>${confidence}%</strong>`;
+          probsText.innerHTML = `<strong>Top Emotions:</strong><br>${top3}`;
         } else {
-          moodText.textContent = "Face nahi dikhai de raha";
+          moodText.textContent = "Face nahi detect ho raha";
           confidenceText.innerHTML = "";
+          probsText.innerHTML = "Apna chehra clearly camera ke saamne rakho aur achha lighting rakho";
         }
-      }, 80); // smooth detection
+      }, 100);
     }
 
-    // Camera band karo
     function stopCamera() {
-      if (detectionInterval) {
-        clearInterval(detectionInterval);
-        detectionInterval = null;
-      }
+      if (detectionInterval) clearInterval(detectionInterval);
       if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop());
+        currentStream.getTracks().forEach(t => t.stop());
         currentStream = null;
       }
       video.srcObject = null;
       canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-      
-      moodText.textContent = "Camera band hai";
-      statusText.textContent = "Status: Camera stopped";
+      moodText.textContent = "Camera band";
+      probsText.innerHTML = "";
     }
 
-    // Page load hone pe
     window.onload = () => {
-      statusText.textContent = "Status: Ready | Camera Start button dabao";
+      statusText.textContent = "Status: Ready | Camera Start Karo button dabao";
     };
 
-    // Cleanup jab page band ho
     window.onbeforeunload = stopCamera;
   </script>
 </body>
